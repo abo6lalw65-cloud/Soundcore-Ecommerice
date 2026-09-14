@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
+import SellerDashboard from './SellerDashboard';
 
-// 1. Mock Data with local product images and brand color
+// Mock Data for the storefront using local images path structure (/images/...)
 const products = [
   { id: 1, name: 'Soundcore C30i', price: 49.99, category: 'Earbuds', seller: 'Tech Store', image: '/images/c30i.png' },
   { id: 2, name: 'Soundcore Q40i', price: 99.99, category: 'Headphones', seller: 'Audio Hub', image: '/images/q40i.png' },
   { id: 3, name: 'Soundcore P30i', price: 59.99, category: 'Earbuds', seller: 'Tech Store', image: '/images/p30i.png' }
 ];
 
-// Brand primary blue color matching the Soundcore logo
 const brandColor = '#00b0ff';
 
 function App() {
   const [cart, setCart] = useState([]);
-  const [showCart, setShowCart] = useState(false);
+  // currentView tracks whether to show 'products', 'cart', or 'seller'
+  const [currentView, setCurrentView] = useState('products');
 
-  // Add product to cart or increment quantity
   const addToCart = (product) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
@@ -27,7 +27,6 @@ function App() {
     });
   };
 
-  // Remove product or decrease quantity
   const removeFromCart = (productId) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === productId);
@@ -46,7 +45,7 @@ function App() {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Navigation Bar with Logo */}
+      {/* Navigation Bar */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/images/logo.png" alt="Soundcore Logo" style={{ width: '35px', height: '35px', objectFit: 'contain' }} />
@@ -54,22 +53,28 @@ function App() {
         </div>
         <div>
           <button 
-            onClick={() => setShowCart(false)} 
-            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: !showCart ? brandColor : '#f8f9fa', color: !showCart ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
+            onClick={() => setCurrentView('products')} 
+            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: currentView === 'products' ? brandColor : '#f8f9fa', color: currentView === 'products' ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
           >
             Products
           </button>
           <button 
-            onClick={() => setShowCart(true)} 
-            style={{ padding: '8px 15px', cursor: 'pointer', backgroundColor: showCart ? brandColor : '#f8f9fa', color: showCart ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
+            onClick={() => setCurrentView('cart')} 
+            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: currentView === 'cart' ? brandColor : '#f8f9fa', color: currentView === 'cart' ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
           >
             Cart ({totalItemsCount})
+          </button>
+          <button 
+            onClick={() => setCurrentView('seller')} 
+            style={{ padding: '8px 15px', cursor: 'pointer', backgroundColor: currentView === 'seller' ? brandColor : '#f8f9fa', color: currentView === 'seller' ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
+          >
+            Seller Dashboard
           </button>
         </div>
       </nav>
 
-      {/* Main Views */}
-      {!showCart ? (
+      {/* Main Views Rendering */}
+      {currentView === 'products' && (
         <div>
           <header style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h1>Browse Latest Audio Gear</h1>
@@ -94,7 +99,9 @@ function App() {
             ))}
           </div>
         </div>
-      ) : (
+      )}
+
+      {currentView === 'cart' && (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h2>Shopping Cart</h2>
           {cart.length === 0 ? (
@@ -134,6 +141,10 @@ function App() {
             </div>
           )}
         </div>
+      )}
+
+      {currentView === 'seller' && (
+        <SellerDashboard />
       )}
 
     </div>
