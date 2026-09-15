@@ -3,10 +3,10 @@ import RoleSelector from './RoleSelector';
 import Auth from './Auth';
 import SellerDashboard from './SellerDashboard';
 import AdminDashboard from './AdminDashboard';
+import Checkout from './Checkout';
 
 const brandColor = '#00b0ff';
 
-// Mock Databases
 const initialUsersDB = [
   { id: 1, fullName: 'Admin User', email: 'admin@soundcore.com', password: '123', role: 'admin' },
   { id: 2, fullName: 'Test Seller', email: 'seller@store.com', password: '123', role: 'seller' },
@@ -26,17 +26,15 @@ function App() {
   const [usersDB, setUsersDB] = useState(initialUsersDB);
   const [sellersDB, setSellersDB] = useState(initialSellersDB);
   const [products, setProducts] = useState(initialProducts);
+  const [notifications, setNotifications] = useState([]); // Global Notifications State
 
-  // Authentication & Session States
-  const [currentUser, setCurrentUser] = useState(null); // null means guest browsing
-  const [authRole, setAuthRole] = useState(null);       // 'customer', 'seller', 'admin' during login/signup modal
-  const [showAuthModal, setShowAuthModal] = useState(false); // Controls login screen appearance
+  const [currentUser, setCurrentUser] = useState(null); 
+  const [authRole, setAuthRole] = useState(null);       
+  const [showAuthModal, setShowAuthModal] = useState(false); 
 
-  // App Navigation States: 'market', 'cart', 'inventory', 'role-select'
   const [currentView, setCurrentView] = useState('market'); 
   const [cart, setCart] = useState([]);
 
-  // Auth Handling
   const handleAuthSubmit = (authData) => {
     const { email, password, fullName, role, isLogin } = authData;
 
@@ -80,9 +78,40 @@ function App() {
     setCurrentView('market');
   };
 
-  // Cart Handling with Stock Check
+  // PAYMENT SUCCESS: Deduct stock and notify sellers
+  const handlePaymentSuccess = (address, method, gatewayRef) => {
+    // 1. Decrease stock for purchased products
+    let updatedProducts = [...products];
+    let newNotifications = [...notifications];
+
+    cart.forEach(cartItem => {
+      updatedProducts = updatedProducts.map(prod => {
+        if (prod.id === cartItem.id) {
+          const newStock = Math.max(0, prod.stock - cartItem.quantity);
+          
+          // 2. Create notification for the specific seller
+          newNotifications.push({
+            seller_id: prod.seller_id,
+            message: `New Order! Customer bought ${cartItem.quantity}x of "${prod.name}". Ref: ${gatewayRef}`,
+            address: address,
+            time: new Date().toLocaleTimeString()
+          });
+
+          return { ...prod, stock: newStock };
+        }
+        return prod;
+      });
+    });
+
+    setProducts(updatedProducts);
+    setNotifications(newNotifications);
+
+    alert('Payment Succeeded! Order placed and sellers have been notified.');
+    setCart([]); 
+    setCurrentView('market'); 
+  };
+
   const addToCart = (product) => {
-    // If user is not logged in or not a customer, prompt them to login first
     if (!currentUser || currentUser.role !== 'customer') {
       alert('Please login as a Customer to add items to your cart.');
       setAuthRole('customer');
@@ -120,7 +149,6 @@ function App() {
   const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  // If Auth Modal is triggered
   if (showAuthModal) {
     return (
       <Auth 
@@ -131,7 +159,6 @@ function App() {
     );
   }
 
-  // If Admin is logged in
   if (currentUser && currentUser.role === 'admin') {
     return (
       <div>
@@ -144,11 +171,9 @@ function App() {
     );
   }
 
-  // Main Application View (Marketplace First for Everyone, Guest or Logged in)
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Top Header / Session Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '10px 20px', borderRadius: '5px', marginBottom: '20px' }}>
         <span>
           {currentUser ? `Welcome, ${currentUser.fullName} (${currentUser.role})` : 'Browsing as Guest'}
@@ -166,7 +191,6 @@ function App() {
         </div>
       </div>
 
-      {/* Navigation Bar */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/images/logo.png" alt="Soundcore Logo" style={{ width: '35px', height: '35px', objectFit: 'contain' }} />
@@ -185,15 +209,19 @@ function App() {
 
           {currentUser && currentUser.role === 'seller' && (
             <button onClick={() => setCurrentView('inventory')} style={navButtonStyle(currentView === 'inventory')}>
-              My Inventory
+              My Inventory & Orders
             </button>
           )}
         </div>
       </nav>
 
-      {/* View Rendering */}
       {currentView === 'inventory' && currentUser && currentUser.role === 'seller' && (
-        <SellerDashboard products={products} setProducts={setProducts} currentUser={currentUser} />
+        <SellerDashboard 
+          products={products} 
+          setProducts={setProducts} 
+          currentUser={currentUser} 
+          notifications={notifications} 
+        />
       )}
 
       {currentView === 'market' && (
@@ -240,7 +268,6 @@ function App() {
             <p style={{ color: 'gray' }}>Your cart is empty.</p>
           ) : (
             <div>
-              {cart.app(item => item)} {/* Keep standard mapping */}
               {cart.map((item) => (
                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', padding: '15px 0' }}>
                   <img src={item.image} alt={item.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '5px' }} />
@@ -250,17 +277,31 @@ function App() {
                   </div>
                   <div>
                     <button onClick={() => addToCart(item)} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>+</button>
-                    <button onClick={() => removeFromCart(item.id)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' }}>-</button>
+                    <button onClick={() => removeFromCardId(item.id)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' }}>-</button>
                   </div>
                 </div>
               ))}
               <div style={{ marginTop: '20px', textAlign: 'right' }}>
                 <h3 style={{ color: '#333' }}>Total: <span style={{ color: brandColor }}>${totalPrice.toFixed(2)}</span></h3>
-                <button style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', fontSize: '16px' }}>Proceed to Checkout</button>
+                <button 
+                  onClick={() => setCurrentView('checkout')} 
+                  style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', fontSize: '16px' }}
+                >
+                  Proceed to Checkout
+                </button>
               </div>
             </div>
           )}
         </div>
+      )}
+
+      {currentView === 'checkout' && (!currentUser || currentUser.role === 'customer') && (
+        <Checkout 
+          cart={cart} 
+          totalPrice={totalPrice} 
+          onPaymentSuccess={handlePaymentSuccess} 
+          onCancel={() => setCurrentView('cart')} 
+        />
       )}
 
     </div>
