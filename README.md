@@ -32,4 +32,4 @@ To run the frontend application locally:
 ```bash
 cd Frontend
 npm install
-npm start
+npm start   

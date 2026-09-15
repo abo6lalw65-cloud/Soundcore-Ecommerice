@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import RoleSelector from './RoleSelector';
 import SellerDashboard from './SellerDashboard';
+import AdminDashboard from './AdminDashboard';
 
-// Mock Data for the storefront using local images path structure (/images/...)
+// Mock Data for the storefront
 const products = [
   { id: 1, name: 'Soundcore C30i', price: 49.99, category: 'Earbuds', seller: 'Tech Store', image: '/images/c30i.png' },
   { id: 2, name: 'Soundcore Q40i', price: 99.99, category: 'Headphones', seller: 'Audio Hub', image: '/images/q40i.png' },
@@ -11,10 +13,14 @@ const products = [
 const brandColor = '#00b0ff';
 
 function App() {
-  const [cart, setCart] = useState([]);
-  // currentView tracks whether to show 'products', 'cart', or 'seller'
-  const [currentView, setCurrentView] = useState('products');
+  // State to track the selected role ('customer', 'seller', 'admin', or null for selection screen)
+  const [userRole, setUserRole] = useState(null);
 
+  // Cart state for the customer view
+  const [cart, setCart] = useState([]);
+  const [showCart, setShowCart] = useState(false);
+
+  // Add product to cart or increment quantity
   const addToCart = (product) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
@@ -27,6 +33,7 @@ function App() {
     });
   };
 
+  // Remove product or decrease quantity
   const removeFromCart = (productId) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === productId);
@@ -42,6 +49,40 @@ function App() {
   const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
+  // 1. If no role is selected yet, show the Role Selector screen
+  if (!userRole) {
+    return <RoleSelector onSelectRole={(role) => setUserRole(role)} />;
+  }
+
+  // 2. If the user selected 'admin', show the Admin Dashboard
+  if (userRole === 'admin') {
+    return (
+      <div>
+        <div style={{ padding: '10px 20px', background: '#f8f9fa', borderBottom: '1px solid #ddd', textAlign: 'right' }}>
+          <button onClick={() => setUserRole(null)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
+            Switch Role / Logout
+          </button>
+        </div>
+        <AdminDashboard />
+      </div>
+    );
+  }
+
+  // 3. If the user selected 'seller', show the Seller Dashboard
+  if (userRole === 'seller') {
+    return (
+      <div>
+        <div style={{ padding: '10px 20px', background: '#f8f9fa', borderBottom: '1px solid #ddd', textAlign: 'right' }}>
+          <button onClick={() => setUserRole(null)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
+            Switch Role / Logout
+          </button>
+        </div>
+        <SellerDashboard />
+      </div>
+    );
+  }
+
+  // 4. Default: Customer Storefront View
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       
@@ -49,32 +90,32 @@ function App() {
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/images/logo.png" alt="Soundcore Logo" style={{ width: '35px', height: '35px', objectFit: 'contain' }} />
-          <h2 style={{ margin: 0, color: brandColor }}>Soundcore Store</h2>
+          <h2 style={{ margin: 0, color: brandColor }}>Soundcore Store (Customer)</h2>
         </div>
         <div>
           <button 
-            onClick={() => setCurrentView('products')} 
-            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: currentView === 'products' ? brandColor : '#f8f9fa', color: currentView === 'products' ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
+            onClick={() => setShowCart(false)} 
+            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: !showCart ? brandColor : '#f8f9fa', color: !showCart ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
           >
             Products
           </button>
           <button 
-            onClick={() => setCurrentView('cart')} 
-            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: currentView === 'cart' ? brandColor : '#f8f9fa', color: currentView === 'cart' ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
+            onClick={() => setShowCart(true)} 
+            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: showCart ? brandColor : '#f8f9fa', color: showCart ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
           >
             Cart ({totalItemsCount})
           </button>
           <button 
-            onClick={() => setCurrentView('seller')} 
-            style={{ padding: '8px 15px', cursor: 'pointer', backgroundColor: currentView === 'seller' ? brandColor : '#f8f9fa', color: currentView === 'seller' ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
+            onClick={() => setUserRole(null)} 
+            style={{ padding: '8px 15px', cursor: 'pointer', backgroundColor: '#ff4d4d', color: 'white', border: 'none', borderRadius: '5px' }}
           >
-            Seller Dashboard
+            Switch Role
           </button>
         </div>
       </nav>
 
-      {/* Main Views Rendering */}
-      {currentView === 'products' && (
+      {/* Conditional Rendering for Customer: Products or Cart */}
+      {!showCart ? (
         <div>
           <header style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h1>Browse Latest Audio Gear</h1>
@@ -99,9 +140,7 @@ function App() {
             ))}
           </div>
         </div>
-      )}
-
-      {currentView === 'cart' && (
+      ) : (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h2>Shopping Cart</h2>
           {cart.length === 0 ? (
@@ -141,10 +180,6 @@ function App() {
             </div>
           )}
         </div>
-      )}
-
-      {currentView === 'seller' && (
-        <SellerDashboard />
       )}
 
     </div>
