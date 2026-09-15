@@ -17,7 +17,6 @@ const initialSellersDB = [
   { seller_id: 2, store_name: 'Audio Hub', approval_status: 'approved' }
 ];
 
-// Centralized Global Products DB (with stock limits & seller assignments)
 const initialProducts = [
   { id: 101, seller_id: 2, seller_name: 'Test Seller', name: 'Soundcore C30i', price: 49.99, category: 'Earbuds', stock: 5, image: '/images/c30i.png' },
   { id: 102, seller_id: 2, seller_name: 'Test Seller', name: 'Soundcore Q40i', price: 99.99, category: 'Headphones', stock: 2, image: '/images/q40i.png' }
@@ -26,12 +25,14 @@ const initialProducts = [
 function App() {
   const [usersDB, setUsersDB] = useState(initialUsersDB);
   const [sellersDB, setSellersDB] = useState(initialSellersDB);
-  const [products, setProducts] = useState(initialProducts); // Global Products State
+  const [products, setProducts] = useState(initialProducts);
 
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  
-  // App Navigation State: 'market', 'cart', 'inventory'
+  // Authentication & Session States
+  const [currentUser, setCurrentUser] = useState(null); // null means guest browsing
+  const [authRole, setAuthRole] = useState(null);       // 'customer', 'seller', 'admin' during login/signup modal
+  const [showAuthModal, setShowAuthModal] = useState(false); // Controls login screen appearance
+
+  // App Navigation States: 'market', 'cart', 'inventory', 'role-select'
   const [currentView, setCurrentView] = useState('market'); 
   const [cart, setCart] = useState([]);
 
@@ -50,7 +51,8 @@ function App() {
           }
         }
         setCurrentUser(user);
-        setCurrentView(user.role === 'seller' ? 'inventory' : 'market'); // Set initial view
+        setShowAuthModal(false);
+        setCurrentView(user.role === 'seller' ? 'inventory' : 'market');
       } else {
         alert('Invalid credentials or wrong role selected!');
       }
@@ -74,33 +76,33 @@ function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setSelectedRole(null);
     setCart([]);
     setCurrentView('market');
   };
 
-  // Cart Handling WITH STOCK LIMIT VERIFICATION
+  // Cart Handling with Stock Check
   const addToCart = (product) => {
+    // If user is not logged in or not a customer, prompt them to login first
+    if (!currentUser || currentUser.role !== 'customer') {
+      alert('Please login as a Customer to add items to your cart.');
+      setAuthRole('customer');
+      setShowAuthModal(true);
+      return;
+    }
+
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
-      
       if (existingItem) {
-        // Check if adding one more exceeds available stock
         if (existingItem.quantity >= product.stock) {
           alert(`Stock Limit Reached: Only ${product.stock} items of ${product.name} are available.`);
-          return prevCart; // Return cart without changes
+          return prevCart;
         }
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
+        return prevCart.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-
-      // Check if product is out of stock entirely before adding
       if (product.stock < 1) {
         alert(`Sorry, ${product.name} is completely out of stock.`);
         return prevCart;
       }
-
       return [...prevCart, { ...product, quantity: 1 }];
     });
   };
@@ -118,15 +120,23 @@ function App() {
   const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  // Flow Routing
-  if (!selectedRole) return <RoleSelector onSelectRole={(role) => setSelectedRole(role)} />;
-  if (!currentUser) return <Auth role={selectedRole} onLogin={handleAuthSubmit} onBack={() => setSelectedRole(null)} />;
+  // If Auth Modal is triggered
+  if (showAuthModal) {
+    return (
+      <Auth 
+        role={authRole || 'customer'} 
+        onLogin={handleAuthSubmit} 
+        onBack={() => setShowAuthModal(false)} 
+      />
+    );
+  }
 
-  if (currentUser.role === 'admin') {
+  // If Admin is logged in
+  if (currentUser && currentUser.role === 'admin') {
     return (
       <div>
         <header style={{ padding: '10px 20px', background: '#f8f9fa', textAlign: 'right' }}>
-          <span>Welcome, {currentUser.fullName} </span>
+          <span>Welcome, {currentUser.fullName} (Admin) </span>
           <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
         </header>
         <AdminDashboard />
@@ -134,17 +144,29 @@ function App() {
     );
   }
 
-  // Common UI for both Customer and Seller
+  // Main Application View (Marketplace First for Everyone, Guest or Logged in)
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Top Header */}
+      {/* Top Header / Session Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '10px 20px', borderRadius: '5px', marginBottom: '20px' }}>
-        <span>Welcome, <strong>{currentUser.fullName}</strong> ({currentUser.role})</span>
-        <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
+        <span>
+          {currentUser ? `Welcome, ${currentUser.fullName} (${currentUser.role})` : 'Browsing as Guest'}
+        </span>
+        <div>
+          {currentUser ? (
+            <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
+          ) : (
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => { setAuthRole('customer'); setShowAuthModal(true); }} style={{ backgroundColor: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Login / Signup</button>
+              <button onClick={() => { setAuthRole('seller'); setShowAuthModal(true); }} style={{ backgroundColor: '#282c34', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Seller Login</button>
+              <button onClick={() => { setAuthRole('admin'); setShowAuthModal(true); }} style={{ backgroundColor: '#ffc107', color: '#333', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Admin Login</button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Navigation Bar (Dynamic based on role) */}
+      {/* Navigation Bar */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/images/logo.png" alt="Soundcore Logo" style={{ width: '35px', height: '35px', objectFit: 'contain' }} />
@@ -155,13 +177,13 @@ function App() {
             Marketplace
           </button>
           
-          {currentUser.role === 'customer' && (
+          {(!currentUser || currentUser.role === 'customer') && (
             <button onClick={() => setCurrentView('cart')} style={navButtonStyle(currentView === 'cart')}>
               Cart ({totalItemsCount})
             </button>
           )}
 
-          {currentUser.role === 'seller' && (
+          {currentUser && currentUser.role === 'seller' && (
             <button onClick={() => setCurrentView('inventory')} style={navButtonStyle(currentView === 'inventory')}>
               My Inventory
             </button>
@@ -170,7 +192,7 @@ function App() {
       </nav>
 
       {/* View Rendering */}
-      {currentView === 'inventory' && currentUser.role === 'seller' && (
+      {currentView === 'inventory' && currentUser && currentUser.role === 'seller' && (
         <SellerDashboard products={products} setProducts={setProducts} currentUser={currentUser} />
       )}
 
@@ -196,7 +218,7 @@ function App() {
                   </p>
                   <h2 style={{ color: brandColor, margin: '10px 0' }}>${product.price}</h2>
                   
-                  {currentUser.role === 'customer' && (
+                  {(!currentUser || currentUser.role === 'customer') && (
                     <button 
                       onClick={() => addToCart(product)}
                       style={{ backgroundColor: '#282c34', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%' }}
@@ -211,13 +233,14 @@ function App() {
         </div>
       )}
 
-      {currentView === 'cart' && currentUser.role === 'customer' && (
+      {currentView === 'cart' && (!currentUser || currentUser.role === 'customer') && (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h2>Shopping Cart</h2>
           {cart.length === 0 ? (
             <p style={{ color: 'gray' }}>Your cart is empty.</p>
           ) : (
             <div>
+              {cart.app(item => item)} {/* Keep standard mapping */}
               {cart.map((item) => (
                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', padding: '15px 0' }}>
                   <img src={item.image} alt={item.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '5px' }} />
@@ -244,7 +267,6 @@ function App() {
   );
 }
 
-// Helper styling function for Navbar buttons
 function navButtonStyle(isActive) {
   return {
     marginRight: '10px', 
