@@ -1,46 +1,115 @@
 import React, { useState } from 'react';
 import RoleSelector from './RoleSelector';
+import Auth from './Auth';
 import SellerDashboard from './SellerDashboard';
 import AdminDashboard from './AdminDashboard';
 
-// Mock Data for the storefront
-const products = [
-  { id: 1, name: 'Soundcore C30i', price: 49.99, category: 'Earbuds', seller: 'Tech Store', image: '/images/c30i.png' },
-  { id: 2, name: 'Soundcore Q40i', price: 99.99, category: 'Headphones', seller: 'Audio Hub', image: '/images/q40i.png' },
-  { id: 3, name: 'Soundcore P30i', price: 59.99, category: 'Earbuds', seller: 'Tech Store', image: '/images/p30i.png' }
-];
-
 const brandColor = '#00b0ff';
 
+// Mock Databases
+const initialUsersDB = [
+  { id: 1, fullName: 'Admin User', email: 'admin@soundcore.com', password: '123', role: 'admin' },
+  { id: 2, fullName: 'Test Seller', email: 'seller@store.com', password: '123', role: 'seller' },
+  { id: 3, fullName: 'Test Customer', email: 'customer@mail.com', password: '123', role: 'customer' }
+];
+
+const initialSellersDB = [
+  { seller_id: 2, store_name: 'Audio Hub', approval_status: 'approved' }
+];
+
+// Centralized Global Products DB (with stock limits & seller assignments)
+const initialProducts = [
+  { id: 101, seller_id: 2, seller_name: 'Test Seller', name: 'Soundcore C30i', price: 49.99, category: 'Earbuds', stock: 5, image: '/images/c30i.png' },
+  { id: 102, seller_id: 2, seller_name: 'Test Seller', name: 'Soundcore Q40i', price: 99.99, category: 'Headphones', stock: 2, image: '/images/q40i.png' }
+];
+
 function App() {
-  // State to track the selected role ('customer', 'seller', 'admin', or null for selection screen)
-  const [userRole, setUserRole] = useState(null);
+  const [usersDB, setUsersDB] = useState(initialUsersDB);
+  const [sellersDB, setSellersDB] = useState(initialSellersDB);
+  const [products, setProducts] = useState(initialProducts); // Global Products State
 
-  // Cart state for the customer view
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  // App Navigation State: 'market', 'cart', 'inventory'
+  const [currentView, setCurrentView] = useState('market'); 
   const [cart, setCart] = useState([]);
-  const [showCart, setShowCart] = useState(false);
 
-  // Add product to cart or increment quantity
+  // Auth Handling
+  const handleAuthSubmit = (authData) => {
+    const { email, password, fullName, role, isLogin } = authData;
+
+    if (isLogin) {
+      const user = usersDB.find(u => u.email === email && u.password === password && u.role === role);
+      if (user) {
+        if (user.role === 'seller') {
+          const sellerData = sellersDB.find(s => s.seller_id === user.id);
+          if (sellerData && sellerData.approval_status !== 'approved') {
+            alert('Your seller account is pending admin approval.');
+            return;
+          }
+        }
+        setCurrentUser(user);
+        setCurrentView(user.role === 'seller' ? 'inventory' : 'market'); // Set initial view
+      } else {
+        alert('Invalid credentials or wrong role selected!');
+      }
+    } else {
+      const userExists = usersDB.find(u => u.email === email);
+      if (userExists) {
+        alert('Email already registered!');
+        return;
+      }
+      const newUser = { id: usersDB.length + 1, fullName: fullName, email: email, password: password, role: role };
+      setUsersDB([...usersDB, newUser]);
+
+      if (role === 'seller') {
+        setSellersDB([...sellersDB, { seller_id: newUser.id, store_name: `${fullName}'s Store`, approval_status: 'pending' }]);
+        alert('Account created! Please wait for admin approval.');
+      } else {
+        alert('Account created successfully! You can now login.');
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setSelectedRole(null);
+    setCart([]);
+    setCurrentView('market');
+  };
+
+  // Cart Handling WITH STOCK LIMIT VERIFICATION
   const addToCart = (product) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
+      
       if (existingItem) {
+        // Check if adding one more exceeds available stock
+        if (existingItem.quantity >= product.stock) {
+          alert(`Stock Limit Reached: Only ${product.stock} items of ${product.name} are available.`);
+          return prevCart; // Return cart without changes
+        }
         return prevCart.map((item) =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
+
+      // Check if product is out of stock entirely before adding
+      if (product.stock < 1) {
+        alert(`Sorry, ${product.name} is completely out of stock.`);
+        return prevCart;
+      }
+
       return [...prevCart, { ...product, quantity: 1 }];
     });
   };
 
-  // Remove product or decrease quantity
   const removeFromCart = (productId) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === productId);
       if (existingItem.quantity > 1) {
-        return prevCart.map((item) =>
-          item.id === productId ? { ...item, quantity: item.quantity - 1 } : item
-        );
+        return prevCart.map((item) => item.id === productId ? { ...item, quantity: item.quantity - 1 } : item);
       }
       return prevCart.filter((item) => item.id !== productId);
     });
@@ -49,98 +118,100 @@ function App() {
   const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  // 1. If no role is selected yet, show the Role Selector screen
-  if (!userRole) {
-    return <RoleSelector onSelectRole={(role) => setUserRole(role)} />;
-  }
+  // Flow Routing
+  if (!selectedRole) return <RoleSelector onSelectRole={(role) => setSelectedRole(role)} />;
+  if (!currentUser) return <Auth role={selectedRole} onLogin={handleAuthSubmit} onBack={() => setSelectedRole(null)} />;
 
-  // 2. If the user selected 'admin', show the Admin Dashboard
-  if (userRole === 'admin') {
+  if (currentUser.role === 'admin') {
     return (
       <div>
-        <div style={{ padding: '10px 20px', background: '#f8f9fa', borderBottom: '1px solid #ddd', textAlign: 'right' }}>
-          <button onClick={() => setUserRole(null)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-            Switch Role / Logout
-          </button>
-        </div>
+        <header style={{ padding: '10px 20px', background: '#f8f9fa', textAlign: 'right' }}>
+          <span>Welcome, {currentUser.fullName} </span>
+          <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
+        </header>
         <AdminDashboard />
       </div>
     );
   }
 
-  // 3. If the user selected 'seller', show the Seller Dashboard
-  if (userRole === 'seller') {
-    return (
-      <div>
-        <div style={{ padding: '10px 20px', background: '#f8f9fa', borderBottom: '1px solid #ddd', textAlign: 'right' }}>
-          <button onClick={() => setUserRole(null)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-            Switch Role / Logout
-          </button>
-        </div>
-        <SellerDashboard />
-      </div>
-    );
-  }
-
-  // 4. Default: Customer Storefront View
+  // Common UI for both Customer and Seller
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Navigation Bar */}
+      {/* Top Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '10px 20px', borderRadius: '5px', marginBottom: '20px' }}>
+        <span>Welcome, <strong>{currentUser.fullName}</strong> ({currentUser.role})</span>
+        <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
+      </div>
+
+      {/* Navigation Bar (Dynamic based on role) */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/images/logo.png" alt="Soundcore Logo" style={{ width: '35px', height: '35px', objectFit: 'contain' }} />
-          <h2 style={{ margin: 0, color: brandColor }}>Soundcore Store (Customer)</h2>
+          <h2 style={{ margin: 0, color: brandColor }}>Soundcore Store</h2>
         </div>
         <div>
-          <button 
-            onClick={() => setShowCart(false)} 
-            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: !showCart ? brandColor : '#f8f9fa', color: !showCart ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
-          >
-            Products
+          <button onClick={() => setCurrentView('market')} style={navButtonStyle(currentView === 'market')}>
+            Marketplace
           </button>
-          <button 
-            onClick={() => setShowCart(true)} 
-            style={{ marginRight: '10px', padding: '8px 15px', cursor: 'pointer', backgroundColor: showCart ? brandColor : '#f8f9fa', color: showCart ? 'white' : 'black', border: '1px solid #ddd', borderRadius: '5px' }}
-          >
-            Cart ({totalItemsCount})
-          </button>
-          <button 
-            onClick={() => setUserRole(null)} 
-            style={{ padding: '8px 15px', cursor: 'pointer', backgroundColor: '#ff4d4d', color: 'white', border: 'none', borderRadius: '5px' }}
-          >
-            Switch Role
-          </button>
+          
+          {currentUser.role === 'customer' && (
+            <button onClick={() => setCurrentView('cart')} style={navButtonStyle(currentView === 'cart')}>
+              Cart ({totalItemsCount})
+            </button>
+          )}
+
+          {currentUser.role === 'seller' && (
+            <button onClick={() => setCurrentView('inventory')} style={navButtonStyle(currentView === 'inventory')}>
+              My Inventory
+            </button>
+          )}
         </div>
       </nav>
 
-      {/* Conditional Rendering for Customer: Products or Cart */}
-      {!showCart ? (
+      {/* View Rendering */}
+      {currentView === 'inventory' && currentUser.role === 'seller' && (
+        <SellerDashboard products={products} setProducts={setProducts} currentUser={currentUser} />
+      )}
+
+      {currentView === 'market' && (
         <div>
           <header style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h1>Browse Latest Audio Gear</h1>
-            <p>Explore multi-vendor sound products</p>
+            <p>Explore products from all our trusted vendors</p>
           </header>
 
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {products.map((product) => (
-              <div key={product.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '10px', width: '220px', textAlign: 'center', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
-                <img src={product.image} alt={product.name} style={{ width: '100%', height: '140px', objectFit: 'contain', borderRadius: '5px', marginBottom: '10px' }} />
-                <h3>{product.name}</h3>
-                <p style={{ color: 'gray', fontSize: '14px' }}>Seller: {product.seller}</p>
-                <p style={{ color: '#555' }}>Category: {product.category}</p>
-                <h2 style={{ color: brandColor }}>${product.price}</h2>
-                <button 
-                  onClick={() => addToCart(product)}
-                  style={{ backgroundColor: '#282c34', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%' }}
-                >
-                  Add to Cart
-                </button>
-              </div>
-            ))}
-          </div>
+          {products.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'gray' }}>No products available in the market right now.</p>
+          ) : (
+            <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {products.map((product) => (
+                <div key={product.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '10px', width: '220px', textAlign: 'center', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+                  <img src={product.image} alt={product.name} style={{ width: '100%', height: '140px', objectFit: 'contain', borderRadius: '5px', marginBottom: '10px' }} />
+                  <h3>{product.name}</h3>
+                  <p style={{ color: 'gray', fontSize: '14px', margin: '5px 0' }}>Sold by: {product.seller_name}</p>
+                  <p style={{ color: '#555', margin: '5px 0' }}>Category: {product.category}</p>
+                  <p style={{ color: product.stock > 0 ? '#28a745' : '#ff4d4d', fontSize: '12px', fontWeight: 'bold' }}>
+                    {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+                  </p>
+                  <h2 style={{ color: brandColor, margin: '10px 0' }}>${product.price}</h2>
+                  
+                  {currentUser.role === 'customer' && (
+                    <button 
+                      onClick={() => addToCart(product)}
+                      style={{ backgroundColor: '#282c34', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%' }}
+                    >
+                      Add to Cart
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
+      )}
+
+      {currentView === 'cart' && currentUser.role === 'customer' && (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h2>Shopping Cart</h2>
           {cart.length === 0 ? (
@@ -155,27 +226,14 @@ function App() {
                     <p style={{ margin: '0', color: brandColor, fontWeight: 'bold' }}>${item.price} x {item.quantity}</p>
                   </div>
                   <div>
-                    <button 
-                      onClick={() => addToCart(item)}
-                      style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}
-                    >
-                      +
-                    </button>
-                    <button 
-                      onClick={() => removeFromCart(item.id)}
-                      style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' }}
-                    >
-                      -
-                    </button>
+                    <button onClick={() => addToCart(item)} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>+</button>
+                    <button onClick={() => removeFromCart(item.id)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' }}>-</button>
                   </div>
                 </div>
               ))}
-              
               <div style={{ marginTop: '20px', textAlign: 'right' }}>
                 <h3 style={{ color: '#333' }}>Total: <span style={{ color: brandColor }}>${totalPrice.toFixed(2)}</span></h3>
-                <button style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', fontSize: '16px' }}>
-                  Proceed to Checkout
-                </button>
+                <button style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', fontSize: '16px' }}>Proceed to Checkout</button>
               </div>
             </div>
           )}
@@ -184,6 +242,20 @@ function App() {
 
     </div>
   );
+}
+
+// Helper styling function for Navbar buttons
+function navButtonStyle(isActive) {
+  return {
+    marginRight: '10px', 
+    padding: '8px 15px', 
+    cursor: 'pointer', 
+    backgroundColor: isActive ? brandColor : '#f8f9fa', 
+    color: isActive ? 'white' : 'black', 
+    border: '1px solid #ddd', 
+    borderRadius: '5px',
+    fontWeight: isActive ? 'bold' : 'normal'
+  };
 }
 
 export default App;
