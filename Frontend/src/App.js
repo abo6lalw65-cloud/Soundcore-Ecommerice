@@ -26,7 +26,7 @@ function App() {
   const [usersDB, setUsersDB] = useState(initialUsersDB);
   const [sellersDB, setSellersDB] = useState(initialSellersDB);
   const [products, setProducts] = useState(initialProducts);
-  const [notifications, setNotifications] = useState([]); // Global Notifications State
+  const [notifications, setNotifications] = useState([]); 
 
   const [currentUser, setCurrentUser] = useState(null); 
   const [authRole, setAuthRole] = useState(null);       
@@ -78,9 +78,7 @@ function App() {
     setCurrentView('market');
   };
 
-  // PAYMENT SUCCESS: Deduct stock and notify sellers
   const handlePaymentSuccess = (address, method, gatewayRef) => {
-    // 1. Decrease stock for purchased products
     let updatedProducts = [...products];
     let newNotifications = [...notifications];
 
@@ -89,7 +87,6 @@ function App() {
         if (prod.id === cartItem.id) {
           const newStock = Math.max(0, prod.stock - cartItem.quantity);
           
-          // 2. Create notification for the specific seller
           newNotifications.push({
             seller_id: prod.seller_id,
             message: `New Order! Customer bought ${cartItem.quantity}x of "${prod.name}". Ref: ${gatewayRef}`,
@@ -159,15 +156,16 @@ function App() {
     );
   }
 
+  // Admin Dashboard Routing with Full Data Passing
   if (currentUser && currentUser.role === 'admin') {
     return (
-      <div>
-        <header style={{ padding: '10px 20px', background: '#f8f9fa', textAlign: 'right' }}>
-          <span>Welcome, {currentUser.fullName} (Admin) </span>
-          <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
-        </header>
-        <AdminDashboard />
-      </div>
+      <AdminDashboard 
+        usersDB={usersDB} 
+        sellersDB={sellersDB} 
+        products={products} 
+        setSellersDB={setSellersDB} 
+        onLogout={handleLogout} 
+      />
     );
   }
 
@@ -277,7 +275,7 @@ function App() {
                   </div>
                   <div>
                     <button onClick={() => addToCart(item)} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>+</button>
-                    <button onClick={() => removeFromCardId(item.id)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' }}>-</button>
+                    <button onClick={() => removeFromCart(item.id)} style={{ backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' }}>-</button>
                   </div>
                 </div>
               ))}
