@@ -1,15 +1,42 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-# A simple home route to check if server is working
+
+# إعدادات السماح بالاتصال من الفرونت إند
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Soundcore Backend API!"}
 
-# A test route to check products
 @app.get("/api/products")
 def get_products():
     return [
-        {"id": 101, "name": "Soundcore C30i", "price": 49.99, "stock": 5},
-        {"id": 102, "name": "Soundcore Q40i", "price": 99.99, "stock": 2}
+        {
+            "id": 101, 
+            "seller_id": 2, 
+            "seller_name": "Audio Hub", 
+            "name": "Soundcore C30i", 
+            "price": 49.99, 
+            "category": "Earbuds", 
+            "stock": 5, 
+            "image": "/images/c30i.png"
+        },
+        {
+            "id": 102, 
+            "seller_id": 2, 
+            "seller_name": "Audio Hub", 
+            "name": "Soundcore Q40i", 
+            "price": 99.99, 
+            "category": "Headphones", 
+            "stock": 2, 
+            "image": "/images/q40i.png"
+        }
     ]

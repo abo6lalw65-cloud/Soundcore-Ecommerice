@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
 import RoleSelector from './RoleSelector';
 import Auth from './Auth';
 import SellerDashboard from './SellerDashboard';
@@ -7,25 +8,28 @@ import Checkout from './Checkout';
 
 const brandColor = '#00b0ff';
 
-const initialUsersDB = [
-  { id: 1, fullName: 'Admin User', email: 'admin@soundcore.com', password: '123', role: 'admin' },
-  { id: 2, fullName: 'Test Seller', email: 'seller@store.com', password: '123', role: 'seller' },
-  { id: 3, fullName: 'Test Customer', email: 'customer@mail.com', password: '123', role: 'customer' }
-];
+
 
 const initialSellersDB = [
   { seller_id: 2, store_name: 'Audio Hub', approval_status: 'approved' }
 ];
 
-const initialProducts = [
-  { id: 101, seller_id: 2, seller_name: 'Test Seller', name: 'Soundcore C30i', price: 49.99, category: 'Earbuds', stock: 5, image: '/images/c30i.png' },
-  { id: 102, seller_id: 2, seller_name: 'Test Seller', name: 'Soundcore Q40i', price: 99.99, category: 'Headphones', stock: 2, image: '/images/q40i.png' }
+const initialUsersDB = [
+  { id: 1, fullName: 'Admin User', email: 'admin@soundcore.com', password: '123', role: 'admin' },
+  { id: 2, fullName: 'Test Seller', email: 'seller@store.com', password: '123', role: 'seller' },
+  { id: 3, fullName: 'Test Customer', email: 'customer@mail.com', password: '123', role: 'customer' }
 ];
-
 function App() {
   const [usersDB, setUsersDB] = useState(initialUsersDB);
   const [sellersDB, setSellersDB] = useState(initialSellersDB);
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/api/products')
+      .then(res => res.json())
+      .then(data => setProducts(data))
+      .catch(err => console.error("Error fetching products from backend:", err));
+  }, []);
   const [notifications, setNotifications] = useState([]); 
 
   const [currentUser, setCurrentUser] = useState(null); 
