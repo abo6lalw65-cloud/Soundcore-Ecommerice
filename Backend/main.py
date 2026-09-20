@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# إعدادات السماح بالاتصال من الفرونت إند
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -49,7 +49,6 @@ python -m uvicorn main:app --reload
 
 ---
 
-## Getting Started
 To run the frontend application locally:
 
 ```bash
