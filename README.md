@@ -5,7 +5,7 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 
 ## Tech Stack
 * **Frontend:** React, JavaScript, HTML5, CSS3, React Hooks (`useState`, `useEffect`)
-* **Backend:** Python, FastAPI, Uvicorn, CORS Middleware
+* **Backend:** Python, FastAPI, Uvicorn, CORS Middleware, Pydantic (Data Validation)
 * **Version Control:** Git, GitHub
 
 ---
@@ -13,16 +13,18 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 ## Current Progress & Features
 
 ### 1. Storefront & Marketplace (Guest & Customer View)
-* Developed an open marketplace allowing users to browse products dynamically fetched from the FastAPI backend upon entering the site.
+* Developed an open marketplace allowing users to browse products dynamically fetched from the FastAPI backend upon entering the site (`/api/products`).
 * Implemented secure cart management with real-time total price calculation and strict stock limit checks.
 * Applied consistent brand styling using the primary Soundcore blue (`#00b0ff`).
 
 ### 2. Backend API & Database Integration
 * Built a robust RESTful API using FastAPI supporting cross-origin resource sharing (CORS) for seamless frontend-backend communication.
-* Configured dynamic product endpoints (`/api/products`) to serve multi-vendor catalog data directly to the React application.
+* Configured dynamic product endpoints (`/api/products`) and user registration endpoints (`/api/register`) to serve multi-vendor catalog and account data directly to the React application.
+* Utilized Pydantic models in FastAPI for strict request data validation and automated interactive API documentation (`/docs` using Swagger UI).
 
 ### 3. Authentication & Role-Based Access Control (RBAC)
-* Built a flexible authentication flow (`Auth.js`) supporting both Login and Sign Up for different platform roles (Customer, Seller, Admin).
+* Built a flexible authentication flow supporting both Login and Sign Up for different platform roles (Customer, Seller, Admin).
+* Integrated frontend React forms directly with the backend `POST /api/register` endpoint to process and store new user accounts dynamically.
 * Secured features so that guests are prompted to log in as customers before adding items to the cart or checking out.
 * Added approval status handling where new seller accounts remain pending until reviewed by the admin.
 
@@ -47,11 +49,8 @@ To run the application locally, you need to start both the Backend and Frontend 
 cd Backend
 python -m uvicorn main:app --reload
 
----
-
-To run the frontend application locally:
-
-```bash
+### 2. Run the Frontend
+Bash
 cd Frontend
 npm install
 npm start

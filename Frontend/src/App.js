@@ -1,48 +1,52 @@
+// Import necessary React hooks and UI components
 import React, { useState, useEffect } from 'react';
-
 import RoleSelector from './RoleSelector';
 import Auth from './Auth';
 import SellerDashboard from './SellerDashboard';
 import AdminDashboard from './AdminDashboard';
 import Checkout from './Checkout';
 
+// Define global brand styling color
 const brandColor = '#00b0ff';
 
-
-
+// Initial mock data for approved sellers
 const initialSellersDB = [
   { seller_id: 2, store_name: 'Audio Hub', approval_status: 'approved' }
 ];
 
+// Initial mock data for predefined system users (Admin, Seller, Customer)
 const initialUsersDB = [
   { id: 1, fullName: 'Admin User', email: 'admin@soundcore.com', password: '123', role: 'admin' },
   { id: 2, fullName: 'Test Seller', email: 'seller@store.com', password: '123', role: 'seller' },
   { id: 3, fullName: 'Test Customer', email: 'customer@mail.com', password: '123', role: 'customer' }
 ];
+
 function App() {
+  // --- States Management ---
   const [usersDB, setUsersDB] = useState(initialUsersDB);
   const [sellersDB, setSellersDB] = useState(initialSellersDB);
   const [products, setProducts] = useState([]);
+  const [notifications, setNotifications] = useState([]); 
+  const [currentUser, setCurrentUser] = useState(null); 
+  const [authRole, setAuthRole] = useState(null);          
+  const [showAuthModal, setShowAuthModal] = useState(false); 
+  const [currentView, setCurrentView] = useState('market'); 
+  const [cart, setCart] = useState([]);
 
+  // --- Fetch Products from FastAPI Backend on Component Mount ---
   useEffect(() => {
     fetch('http://127.0.0.1:8000/api/products')
       .then(res => res.json())
       .then(data => setProducts(data))
       .catch(err => console.error("Error fetching products from backend:", err));
   }, []);
-  const [notifications, setNotifications] = useState([]); 
 
-  const [currentUser, setCurrentUser] = useState(null); 
-  const [authRole, setAuthRole] = useState(null);       
-  const [showAuthModal, setShowAuthModal] = useState(false); 
-
-  const [currentView, setCurrentView] = useState('market'); 
-  const [cart, setCart] = useState([]);
-
-  const handleAuthSubmit = (authData) => {
+  // --- Handle Authentication (Login and Backend Signup via POST) ---
+  const handleAuthSubmit = async (authData) => {
     const { email, password, fullName, role, isLogin } = authData;
 
     if (isLogin) {
+      // Local login check against usersDB
       const user = usersDB.find(u => u.email === email && u.password === password && u.role === role);
       if (user) {
         if (user.role === 'seller') {
@@ -59,29 +63,60 @@ function App() {
         alert('Invalid credentials or wrong role selected!');
       }
     } else {
-      const userExists = usersDB.find(u => u.email === email);
-      if (userExists) {
-        alert('Email already registered!');
-        return;
-      }
-      const newUser = { id: usersDB.length + 1, fullName: fullName, email: email, password: password, role: role };
-      setUsersDB([...usersDB, newUser]);
+      // Send registration request to FastAPI backend using POST method
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            full_name: fullName,
+            email: email,
+            password: password,
+            role: role,
+            store_name: role === 'seller' ? `${fullName}'s Store` : null
+          }),
+        });
 
-      if (role === 'seller') {
-        setSellersDB([...sellersDB, { seller_id: newUser.id, store_name: `${fullName}'s Store`, approval_status: 'pending' }]);
-        alert('Account created! Please wait for admin approval.');
-      } else {
-        alert('Account created successfully! You can now login.');
+        const data = await response.json();
+
+        if (response.ok) {
+          // Update frontend users state dynamically so the user can login immediately
+          const newUser = { 
+            id: data.user.id, 
+            fullName: data.user.full_name, 
+            email: data.user.email, 
+            password: password, 
+            role: data.user.role 
+          };
+          setUsersDB([...usersDB, newUser]);
+
+          if (role === 'seller') {
+            setSellersDB([...sellersDB, { seller_id: newUser.id, store_name: `${fullName}'s Store`, approval_status: 'pending' }]);
+            alert('Account created on Backend! Please wait for admin approval.');
+          } else {
+            alert('Account created successfully on Backend! You can now login.');
+          }
+          setShowAuthModal(false);
+        } else {
+          alert(`Error: ${data.detail || 'Failed to register'}`);
+        }
+      } catch (error) {
+        console.error('Error connecting to backend during registration:', error);
+        alert('تعذر الاتصال بالباك إند، تأكد أن السيرفر يعمل.');
       }
     }
   };
 
+  // --- Handle User Logout ---
   const handleLogout = () => {
     setCurrentUser(null);
     setCart([]);
     setCurrentView('market');
   };
 
+  // --- Handle Successful Payment & Stock Reduction ---
   const handlePaymentSuccess = (address, method, gatewayRef) => {
     let updatedProducts = [...products];
     let newNotifications = [...notifications];
@@ -112,6 +147,7 @@ function App() {
     setCurrentView('market'); 
   };
 
+  // --- Cart Management: Add Item ---
   const addToCart = (product) => {
     if (!currentUser || currentUser.role !== 'customer') {
       alert('Please login as a Customer to add items to your cart.');
@@ -137,6 +173,7 @@ function App() {
     });
   };
 
+  // --- Cart Management: Remove Item ---
   const removeFromCart = (productId) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === productId);
@@ -147,9 +184,11 @@ function App() {
     });
   };
 
+  // --- Calculations for Cart Totals ---
   const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
+  // --- Conditional View: Authentication Modal ---
   if (showAuthModal) {
     return (
       <Auth 
@@ -160,7 +199,7 @@ function App() {
     );
   }
 
-  // Admin Dashboard Routing with Full Data Passing
+  // --- Conditional View: Admin Dashboard ---
   if (currentUser && currentUser.role === 'admin') {
     return (
       <AdminDashboard 
@@ -173,9 +212,11 @@ function App() {
     );
   }
 
+  // --- Main Application Layout & Views ---
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       
+      {/* Top Bar: User Status & Navigation Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '10px 20px', borderRadius: '5px', marginBottom: '20px' }}>
         <span>
           {currentUser ? `Welcome, ${currentUser.fullName} (${currentUser.role})` : 'Browsing as Guest'}
@@ -193,6 +234,7 @@ function App() {
         </div>
       </div>
 
+      {/* Main Navigation Bar */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '15px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/images/logo.png" alt="Soundcore Logo" style={{ width: '35px', height: '35px', objectFit: 'contain' }} />
@@ -217,6 +259,7 @@ function App() {
         </div>
       </nav>
 
+      {/* Seller Dashboard View */}
       {currentView === 'inventory' && currentUser && currentUser.role === 'seller' && (
         <SellerDashboard 
           products={products} 
@@ -226,6 +269,7 @@ function App() {
         />
       )}
 
+      {/* Marketplace Products View */}
       {currentView === 'market' && (
         <div>
           <header style={{ textAlign: 'center', marginBottom: '30px' }}>
@@ -263,6 +307,7 @@ function App() {
         </div>
       )}
 
+      {/* Shopping Cart View */}
       {currentView === 'cart' && (!currentUser || currentUser.role === 'customer') && (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h2>Shopping Cart</h2>
@@ -297,6 +342,7 @@ function App() {
         </div>
       )}
 
+      {/* Checkout View */}
       {currentView === 'checkout' && (!currentUser || currentUser.role === 'customer') && (
         <Checkout 
           cart={cart} 
@@ -310,6 +356,7 @@ function App() {
   );
 }
 
+// Helper function for dynamic navigation button styling
 function navButtonStyle(isActive) {
   return {
     marginRight: '10px', 
