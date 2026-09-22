@@ -1,11 +1,12 @@
 # Soundcore Multi-Vendor E-Commerce Platform
 
 ## Project Concept
-An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audio products. The platform connects customers with various sellers and administrators in a unified, branded environment, powered by a decoupled architecture (React frontend and FastAPI backend).
+An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audio products. The platform connects customers with various sellers and administrators in a unified, branded environment, powered by a decoupled architecture (React frontend and FastAPI backend) backed by a persistent relational database.
 
 ## Tech Stack
 * **Frontend:** React, JavaScript, HTML5, CSS3, React Hooks (`useState`, `useEffect`)
 * **Backend:** Python, FastAPI, Uvicorn, CORS Middleware, Pydantic (Data Validation)
+* **Database & ORM:** SQLite (`soundcore.db`), SQLAlchemy, Python-based Migrations/Schema Creation
 * **Version Control:** Git, GitHub
 
 ---
@@ -17,14 +18,15 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 * Implemented secure cart management with real-time total price calculation and strict stock limit checks.
 * Applied consistent brand styling using the primary Soundcore blue (`#00b0ff`).
 
-### 2. Backend API & Database Integration
+### 2. Backend API & Persistent Database Integration
 * Built a robust RESTful API using FastAPI supporting cross-origin resource sharing (CORS) for seamless frontend-backend communication.
-* Configured dynamic product endpoints (`/api/products`) and user registration endpoints (`/api/register`) to serve multi-vendor catalog and account data directly to the React application.
+* Integrated **SQLite** via **SQLAlchemy** to establish a persistent relational database (`soundcore.db`), ensuring that all registered users and data are permanently saved across server restarts.
+* Configured dynamic product endpoints (`/api/products`) and persistent user registration endpoints (`/api/register`) to serve multi-vendor catalog and account data directly to the React application.
 * Utilized Pydantic models in FastAPI for strict request data validation and automated interactive API documentation (`/docs` using Swagger UI).
 
 ### 3. Authentication & Role-Based Access Control (RBAC)
 * Built a flexible authentication flow supporting both Login and Sign Up for different platform roles (Customer, Seller, Admin).
-* Integrated frontend React forms directly with the backend `POST /api/register` endpoint to process and store new user accounts dynamically.
+* Integrated frontend React forms directly with the backend `POST /api/register` endpoint to process and store new user accounts permanently in the database.
 * Secured features so that guests are prompted to log in as customers before adding items to the cart or checking out.
 * Added approval status handling where new seller accounts remain pending until reviewed by the admin.
 
@@ -44,13 +46,13 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 
 To run the application locally, you need to start both the Backend and Frontend servers in separate terminals:
 
-### 1. Run the Backend (FastAPI)
+### 1. Run the Frontend
+cd Frontend
+npm install
+npm start
+
+### 2. Run the Backend (FastAPI)
 ```bash
 cd Backend
 python -m uvicorn main:app --reload
 
-### 2. Run the Frontend
-Bash
-cd Frontend
-npm install
-npm start

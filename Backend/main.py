@@ -1,10 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+
+# Import database session, engine, and models
+from database import engine, SessionLocal, Base
+import models
+
+# Automatically create database tables if they do not exist
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# Enable CORS middleware to allow communication with the React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,108 +22,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- نموذج بيانات التسجيل (Pydantic Model) ---
-# هذا النموذج يحدد بدقة شكل البيانات التي سيُرسلها المستخدم عند إنشاء حساب جديد
+# Dependency to get the database session for each request
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Pydantic model for incoming registration data validation from frontend
 class UserCreate(BaseModel):
     full_name: str
     email: str
     password: str
-    role: str = "customer"  # القيمة الافتراضية للرتبة هي عميل، ويمكن أن تكون "seller"
-    store_name: Optional[str] = None  # اسم المتجر مطلوب فقط إذا كان المستخدم بائعاً
+    role: str = "customer"
+    store_name: Optional[str] = None
 
-
-# --- قواعد البيانات الوهمية (مع إمكانية التعديل عليها) ---
-
-products_db = [
-    {
-        "id": 101, 
-        "seller_id": 2, 
-        "seller_name": "Audio Hub", 
-        "name": "Soundcore C30i", 
-        "price": 49.99, 
-        "category": "Earbuds", 
-        "stock": 5, 
-        "image": "/images/c30i.png"
-    },
-    {
-        "id": 102, 
-        "seller_id": 2, 
-        "seller_name": "Audio Hub", 
-        "name": "Soundcore Q40i", 
-        "price": 99.99, 
-        "category": "Headphones", 
-        "stock": 2, 
-        "image": "/images/q40i.png"
-    }
-]
-
-users_db = [
-    {"id": 1, "full_name": "Admin User", "email": "admin@soundcore.com", "password": "123", "role": "admin"},
-    {"id": 2, "full_name": "Audio Hub", "email": "seller@audiohub.com", "password": "123", "role": "seller", "store_name": "Audio Hub"},
-    {"id": 3, "full_name": "Test Customer", "email": "customer@mail.com", "password": "123", "role": "customer"}
-]
-
-orders_db = [
-    {
-        "order_id": 501,
-        "customer_id": 3,
-        "total_amount": 149.98,
-        "status": "pending",
-        "items": [
-            {"product_id": 101, "quantity": 1, "price": 49.99},
-            {"product_id": 102, "quantity": 1, "price": 99.99}
-        ]
-    }
-]
-
-# --- المسارات (Endpoints) ---
-
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to Soundcore Backend API!"}
-
-@app.get("/api/products")
-def get_products():
-    return products_db
-
+# API Endpoint to fetch all registered users from the real database
 @app.get("/api/users")
-def get_users():
-    return users_db
+def get_users(db: Session = Depends(get_db)):
+    users = db.query(models.User).all()
+    return users
 
-# --- مسار تسجيل حساب جديد (POST) ---
+# API Endpoint to register a new user and save them permanently in SQLite
 @app.post("/api/register")
-def register_user(user: UserCreate):
-    # 1. التأكد هل الإيميل مسجل مسبقاً أم لا
-    for existing_user in users_db:
-        if existing_user["email"] == user.email:
-            raise HTTPException(status_code=400, status_email="Email already registered")
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    # Check if the email is already registered in the database
+    existing_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    # 2. إنشاء معرف جديد تلقائياً (رقم الـ ID التالي)
-    new_id = len(users_db) + 1
+    # Create a new user database record
+    new_user = models.User(
+        full_name=user.full_name,
+        email=user.email,
+        password=user.password,
+        role=user.role,
+        store_name=user.store_name if user.role == "seller" else None
+    )
     
-    # 3. تجهيز بيانات المستخدم الجديد
-    new_user = {
-        "id": new_id,
-        "full_name": user.full_name,
-        "email": user.email,
-        "password": user.password,  # ملاحظة: لاحقاً سنتعلم كيف نشفر كلمة المرور لأسباب أمنية
-        "role": user.role,
-        "store_name": user.store_name if user.role == "seller" else None
-    }
-    
-    # 4. حفظ المستخدم في قاعدة البيانات المؤقتة
-    users_db.append(new_user)
+    # Save the user permanently into the SQLite database
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
     
     return {
-        "message": "User registered successfully!",
+        "message": "User registered successfully in SQLite Database!",
         "user": {
-            "id": new_user["id"],
-            "full_name": new_user["full_name"],
-            "email": new_user["email"],
-            "role": new_user["role"]
+            "id": new_user.id,
+            "full_name": new_user.full_name,
+            "email": new_user.email,
+            "role": new_user.role
         }
     }
-
-@app.get("/api/orders")
-def get_orders():
-    return orders_db
