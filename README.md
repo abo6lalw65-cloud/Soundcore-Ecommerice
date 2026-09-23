@@ -6,7 +6,7 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 ## Tech Stack
 * **Frontend:** React, JavaScript, HTML5, CSS3, React Hooks (`useState`, `useEffect`)
 * **Backend:** Python, FastAPI, Uvicorn, CORS Middleware, Pydantic (Data Validation)
-* **Database & ORM:** SQLite (`soundcore.db`), SQLAlchemy, Python-based Migrations/Schema Creation
+* **Database & ORM:** SQLite (`soundcore.db`), SQLAlchemy, Relational Models (Users & Products with Foreign Key relationships)
 * **Version Control:** Git, GitHub
 
 ---
@@ -14,30 +14,30 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 ## Current Progress & Features
 
 ### 1. Storefront & Marketplace (Guest & Customer View)
-* Developed an open marketplace allowing users to browse products dynamically fetched from the FastAPI backend upon entering the site (`/api/products`).
+* Developed an open marketplace allowing users to browse products dynamically fetched from the persistent FastAPI backend database upon entering the site (`/api/products`).
 * Implemented secure cart management with real-time total price calculation and strict stock limit checks.
 * Applied consistent brand styling using the primary Soundcore blue (`#00b0ff`).
 
-### 2. Backend API & Persistent Database Integration
+### 2. Backend API & Persistent Relational Database Integration
 * Built a robust RESTful API using FastAPI supporting cross-origin resource sharing (CORS) for seamless frontend-backend communication.
-* Integrated **SQLite** via **SQLAlchemy** to establish a persistent relational database (`soundcore.db`), ensuring that all registered users and data are permanently saved across server restarts.
-* Configured dynamic product endpoints (`/api/products`) and persistent user registration endpoints (`/api/register`) to serve multi-vendor catalog and account data directly to the React application.
+* Integrated **SQLite** via **SQLAlchemy** to establish a persistent relational database (`soundcore.db`), ensuring that all registered users, vendors, and product inventories are permanently saved across server restarts.
+* Configured dynamic product endpoints (`GET/POST/DELETE /api/products`) and persistent authentication endpoints (`/api/register`, `/api/login`) to serve catalog and account data directly to the React application.
 * Utilized Pydantic models in FastAPI for strict request data validation and automated interactive API documentation (`/docs` using Swagger UI).
 
 ### 3. Authentication & Role-Based Access Control (RBAC)
-* Built a flexible authentication flow supporting both Login and Sign Up for different platform roles (Customer, Seller, Admin).
-* Integrated frontend React forms directly with the backend `POST /api/register` endpoint to process and store new user accounts permanently in the database.
+* Built a flexible authentication flow supporting both Login and Sign Up against the database for different platform roles (Customer, Seller, Admin).
+* Integrated frontend React forms directly with backend endpoints to process and store new user accounts permanently.
 * Secured features so that guests are prompted to log in as customers before adding items to the cart or checking out.
 * Added approval status handling where new seller accounts remain pending until reviewed by the admin.
 
 ### 4. Seller Dashboard & Inventory Management
-* Created a dedicated inventory management interface for vendors.
+* Created a dedicated inventory management interface for vendors connected to the persistent database.
 * Implemented local file upload functionality allowing sellers to select product images directly from their device with live preview.
-* Added dynamic product creation (Name, Price, Category, Stock Quantity, Local Image) and deletion capabilities.
+* Added dynamic product creation (Name, Price, Category, Stock Quantity, Local Image linked to seller ID) and deletion capabilities.
 
 ### 5. Live Orders, Notifications & Stock Reduction
 * Integrated a secure simulated checkout workflow supporting Stripe and PayPal payment methods.
-* Programmed automated inventory updates that deduct purchased quantities from the stock upon successful payment.
+* Programmed automated inventory updates that deduct purchased quantities from the database stock upon successful payment.
 * Developed a live notification system inside the seller dashboard alerting vendors instantly of new customer orders and delivery addresses.
 
 ---
@@ -46,7 +46,7 @@ An advanced multi-vendor e-commerce web platform specialized in "Soundcore" audi
 
 To run the application locally, you need to start both the Backend and Frontend servers in separate terminals:
 
-### 1. Run the Frontend
+### 1. Run the Frontend(React)
 cd Frontend
 npm install
 npm start
@@ -55,4 +55,3 @@ npm start
 ```bash
 cd Backend
 python -m uvicorn main:app --reload
-
