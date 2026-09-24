@@ -11,12 +11,67 @@ function Auth({ role, onLogin, onBack }) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
-  const handleSubmit = (e) => {
+  // Handle form submission for both Login and Registration
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // We send the form data back to App.js to process it against the Mock DB
-    const authData = { email, password, fullName, role, isLogin };
-    onLogin(authData);
+    if (isLogin) {
+        // --- Login Process ---
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email, password: password })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Validate if the selected role matches the user's stored role
+                if (data.user.role !== role.toLowerCase()) {
+                    alert("Invalid credentials or wrong role selected!");
+                    return;
+                }
+                alert("Login successful!");
+                // Trigger the onLogin callback with user data
+                if (onLogin) onLogin(data.user); 
+            } else {
+                alert("Invalid email or password!");
+            }
+        } catch (error) {
+            console.error("Error logging in:", error);
+        }
+    } else {
+        // --- Sign Up / Registration Process ---
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    full_name: fullName, 
+                    email: email, 
+                    password: password,
+                    role: role.toLowerCase()
+                })
+            });
+
+            if (response.ok) {
+                alert("Account created successfully! You can now login.");
+                setIsLogin(true); // Switch back to login view after successful registration
+            } else {
+                const errorData = await response.json();
+                
+                // Handle Pydantic validation errors array safely to prevent [object Object] alert
+                if (Array.isArray(errorData.detail)) {
+                    const errorMessages = errorData.detail.map(err => err.msg).join(", ");
+                    alert("Validation Error: " + errorMessages);
+                } else {
+                    alert("Error: " + (errorData.detail || "Registration failed"));
+                }
+            }
+        } catch (error) {
+            console.error("Error registering:", error);
+        }
+    }
   };
 
   return (
